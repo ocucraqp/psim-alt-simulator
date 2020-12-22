@@ -116,19 +116,6 @@ vector<vector<double>>
 calc_il(vector<pair<double, int>> T, vector<vector<pair<double, double>>> ui, vector<double> ut) {
     vector<vector<double>> il(PORT);
 
-    // t=0のときの電圧
-    vector<double> u_0(3, 0);
-    for (int i = 0; i < PORT; ++i) {
-        for (int j = 0; j < 5; ++j) {
-            if (0 <= ui[i][j].second) {
-                u_0[i] = ui[i][j].first;
-                break;
-            }
-        }
-    }
-    double ut_0 = (L[1] * L[2] * u_0[0] + L[0] * L[2] * u_0[1] + L[0] * L[1] * u_0[2]) /
-                  (L[1] * L[2] + L[0] * L[2] + L[0] * L[1]);
-
     // t=0のときの電流
     vector<double> i_0(3, 0);
     for (int i = 0; i < PORT; ++i) {
@@ -144,7 +131,7 @@ calc_il(vector<pair<double, int>> T, vector<vector<pair<double, double>>> ui, ve
 
             // t=0で計算終了
             if (T[j].first >= 0) {
-                i_0[i] += (u_0[i] - ut_0) * T_PERIOD * ((0 - T[j - 1].first) / (2 * M_PI));
+                i_0[i] += (ui_tj - ut[j]) * T_PERIOD * ((0 - T[j - 1].first) / (2 * M_PI));
                 i_0[i] *= -(1 / (2 * L[i]));
                 break;
             }
