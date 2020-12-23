@@ -18,6 +18,7 @@ static const int PORT = 3;
 static const double L[] = {37 * pow(10, -6), 37 * pow(10, -6), 37 * pow(10, -6)};
 static const double F_SW = 20000;
 static const double T_PERIOD = 1 / F_SW;
+static const int PARTITION_N = 1000;
 
 vector<pair<double, int>> calc_timing(vector<double> phi, vector<double> delta) {
     // 電圧変動時間（周期中のタイミング）の計算
@@ -181,15 +182,14 @@ vector<double> calc_il_peak(vector<vector<double>> il) {
 }
 
 vector<double>
-calc_il_rms(vector<vector<pair<double, double>>> ui, vector<pair<double, double>> ut, vector<double> il_0,
-            int partition_n) {
+calc_il_rms(vector<vector<pair<double, double>>> ui, vector<pair<double, double>> ut, vector<double> il_0) {
     vector<double> il_rms(PORT, 0);
 
     for (int i = 0; i < PORT; ++i) {
         double il = il_0[i];
-        for (int j = 1; j < partition_n; ++j) {
-            double t = -M_PI + ((2 * M_PI / partition_n) * j);
-            double t_1 = -M_PI + ((2 * M_PI / partition_n) * (j - 1));
+        for (int j = 1; j < PARTITION_N; ++j) {
+            double t = -M_PI + ((2 * M_PI / PARTITION_N) * j);
+            double t_1 = -M_PI + ((2 * M_PI / PARTITION_N) * (j - 1));
             // t時のuiを求める
             double ui_t = get_u_t(ui[i], t);
             double ut_t = get_u_t(ut, t);
@@ -197,7 +197,7 @@ calc_il_rms(vector<vector<pair<double, double>>> ui, vector<pair<double, double>
             il += (1 / L[i]) * (ui_t - ut_t) * T_PERIOD * ((t - t_1) / (2 * M_PI));
             il_rms[i] += pow(il, 2);
         }
-        il_rms[i] = sqrt(il_rms[i] / partition_n);
+        il_rms[i] = sqrt(il_rms[i] / PARTITION_N);
     }
 
     return il_rms;
@@ -230,7 +230,7 @@ void calc(vector<double> v, vector<double> phi, vector<double> delta) {
 
     // il_rms: vector<実効電流>　
     vector<double> il_rms;
-    il_rms = calc_il_rms(ui, ut, il_0, 100);
+    il_rms = calc_il_rms(ui, ut, il_0);
 
     // output
     cout << "Input" << endl;
