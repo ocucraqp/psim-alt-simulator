@@ -88,9 +88,9 @@ calc_ui(vector<double> v, vector<double> phi, vector<double> delta, vector<pair<
     return ui;
 }
 
-vector<double>
+vector<pair<double, double>>
 calc_ut(vector<vector<pair<double, double>>> ui, vector<pair<double, int>> T) {
-    vector<double> ut;
+    vector<pair<double, double>> ut;
 
     for (auto &t : T) {
         // 時間ごとの各ポートの電圧を確認
@@ -106,55 +106,61 @@ calc_ut(vector<vector<pair<double, double>>> ui, vector<pair<double, int>> T) {
 
         double u_t = (L[1] * L[2] * u[0] + L[0] * L[2] * u[1] + L[0] * L[1] * u[2]) /
                      (L[1] * L[2] + L[0] * L[2] + L[0] * L[1]);
-        ut.emplace_back(u_t);
+        ut.emplace_back(u_t, t.first);
     }
 
     return ut;
 }
 
-vector<vector<double>>
-calc_il(vector<pair<double, int>> T, vector<vector<pair<double, double>>> ui, vector<double> ut) {
-    vector<vector<double>> il(PORT);
+double get_u_t(vector<pair<double, double>> u, double t) {
+    // T[j]時のuiを求める
+    double u_t = 0;
+    for (auto &u_tmp : u) {
+        if (t <= u_tmp.second) {
+            u_t = u_tmp.first;
+            break;
+        }
+    }
+    return u_t;
+}
 
-    // t=0のときの電流
-    vector<double> i_0(3, 0);
+vector<double>
+calc_il_t(vector<pair<double, int>> T, vector<vector<pair<double, double>>> ui, vector<pair<double, double>> ut,
+          double t) {
+    vector<double> il_t(3, 0);
     for (int i = 0; i < PORT; ++i) {
         for (int j = 1; j < T.size(); ++j) {
             // T[j]時のuiを求める
-            double ui_tj = 0;
-            for (auto &ui_tmp : ui[i]) {
-                if (T[j].first <= ui_tmp.second) {
-                    ui_tj = ui_tmp.first;
-                    break;
-                }
-            }
+            double ui_tj = get_u_t(ui[i], T[j].first);
 
             // t=0で計算終了
-            if (T[j].first >= 0) {
-                i_0[i] += (ui_tj - ut[j]) * T_PERIOD * ((0 - T[j - 1].first) / (2 * M_PI));
-                i_0[i] *= -(1 / (2 * L[i]));
+            if (T[j].first >= t) {
+                il_t[i] += (ui_tj - ut[j].first) * T_PERIOD * ((0 - T[j - 1].first) / (2 * M_PI));
+                il_t[i] *= -(1 / (2 * L[i]));
                 break;
             }
 
             // t<0のとき
-            i_0[i] += (ui_tj - ut[j]) * T_PERIOD * ((T[j].first - T[j - 1].first) / (2 * M_PI));
+            il_t[i] += (ui_tj - ut[j].first) * T_PERIOD * ((T[j].first - T[j - 1].first) / (2 * M_PI));
         }
     }
 
+    return il_t;
+}
+
+vector<vector<double>>
+calc_il(vector<pair<double, int>> T, vector<vector<pair<double, double>>> ui, vector<pair<double, double>> ut,
+        vector<double> il_0) {
+    vector<vector<double>> il(PORT);
+
     for (int i = 0; i < PORT; ++i) {
-        il[i].emplace_back(i_0[i]);
+        il[i].emplace_back(il_0[i]);
         for (int j = 1; j < T.size(); ++j) {
             // T[j]時のuiを求める
-            double ui_tj = 0;
-            for (auto &ui_tmp : ui[i]) {
-                if (T[j].first <= ui_tmp.second) {
-                    ui_tj = ui_tmp.first;
-                    break;
-                }
-            }
+            double ui_tj = get_u_t(ui[i], T[j].first);
 
             double i_tmp = il[i][j - 1] +
-                           (1 / L[i]) * (ui_tj - ut[j]) * T_PERIOD * ((T[j].first - T[j - 1].first) / (2 * M_PI));
+                           (1 / L[i]) * (ui_tj - ut[j].first) * T_PERIOD * ((T[j].first - T[j - 1].first) / (2 * M_PI));
             il[i].emplace_back(i_tmp);
         }
     }
@@ -174,27 +180,30 @@ vector<double> calc_il_peak(vector<vector<double>> il) {
     return il_peak;
 }
 
-void calc() {
-    // input
-    vector<double> v(3, 0), phi(3, 0), delta(3, 0);
-//    for (int i = 0; i < PORT; ++i) {
-//        cin >> v[i];
-//    }
-//    for (int i = 0; i < PORT; ++i) {
-//        cin >> phi[i];
-//    }
-//    for (int i = 0; i < PORT; ++i) {
-//        cin >> delta[i];
-//    }
-    v[0] = 400, v[1] = 400, v[2] = 200;
-    phi[0] = 0, phi[1] = 30, phi[2] = 40;
-    delta[2] = 70, delta[0] = delta[2] * v[2] / v[0], delta[1] = delta[2] * v[2] / v[1];
-    // phiとdeltaはラジアンに変換
+vector<double>
+calc_il_rms(vector<vector<pair<double, double>>> ui, vector<pair<double, double>> ut, vector<double> il_0,
+            int partition_n) {
+    vector<double> il_rms(PORT, 0);
+
     for (int i = 0; i < PORT; ++i) {
-        phi[i] *= M_PI / 180;
-        delta[i] *= M_PI / 180;
+        double il = il_0[i];
+        for (int j = 1; j < partition_n; ++j) {
+            double t = -M_PI + ((2 * M_PI / partition_n) * j);
+            double t_1 = -M_PI + ((2 * M_PI / partition_n) * (j - 1));
+            // t時のuiを求める
+            double ui_t = get_u_t(ui[i], t);
+            double ut_t = get_u_t(ut, t);
+            // ilの計算
+            il += (1 / L[i]) * (ui_t - ut_t) * T_PERIOD * ((t - t_1) / (2 * M_PI));
+            il_rms[i] += pow(il, 2);
+        }
+        il_rms[i] = sqrt(il_rms[i] / partition_n);
     }
 
+    return il_rms;
+}
+
+void calc(vector<double> v, vector<double> phi, vector<double> delta) {
     // T: vector<pair<時間，ポート番号>>
     vector<pair<double, int>> T;
     T = calc_timing(phi, delta);
@@ -204,20 +213,89 @@ void calc() {
     ui = calc_ui(v, phi, delta, T);
 
     // ut: vector<電圧>
-    vector<double> ut;
+    vector<pair<double, double>> ut;
     ut = calc_ut(ui, T);
+
+    // il_0: vector<電流>
+    vector<double> il_0;
+    il_0 = calc_il_t(T, ui, ut, 0);
 
     // il: vector<vector<電流>>
     vector<vector<double>> il;
-    il = calc_il(T, ui, ut);
+    il = calc_il(T, ui, ut, il_0);
 
-    // il_peak: vector<電流>　
+    // il_peak: vector<ピーク電流>　
     vector<double> il_peak;
     il_peak = calc_il_peak(il);
-};
+
+    // il_rms: vector<実効電流>　
+    vector<double> il_rms;
+    il_rms = calc_il_rms(ui, ut, il_0, 100);
+
+    // output
+    cout << "Input" << endl;
+    cout << "V1:" << v[0] << ", V2:" << v[1] << ", V3:" << v[2] << endl;
+    cout << "phi1:" << phi[0] * 180 / M_PI << ", phi2:" << phi[1] * 180 / M_PI << ", phi3:" << phi[2] * 180 / M_PI
+         << endl;
+    cout << "delta1:" << delta[0] * 180 / M_PI << ", delta2:" << delta[1] * 180 / M_PI << ", delta3:"
+         << delta[2] * 180 / M_PI << endl;
+    cout << endl << "Output" << endl;
+    cout << "il1_peak:" << il_peak[0] << ", il2_peak:" << il_peak[1] << ", il3_peak:" << il_peak[2] << endl;
+    cout << "il1_rms:" << il_rms[0] << ", il2_rms:" << il_rms[1] << ", il3_rms:" << il_rms[2] << endl;
+    cout << endl;
+
+}
+
+void calc_by_input_std() {
+    vector<double> v(3, 0), phi(3, 0), delta(3, 0);
+
+    for (int i = 0; i < PORT; ++i) {
+        cin >> v[i];
+    }
+    for (int i = 0; i < PORT; ++i) {
+        cin >> phi[i];
+    }
+    for (int i = 0; i < PORT; ++i) {
+        cin >> delta[i];
+    }
+
+    // deltaとphiはラジアンに変換
+    for (int i = 0; i < PORT; ++i) {
+        phi[i] *= M_PI / 180;
+        delta[i] *= M_PI / 180;
+    }
+
+    calc(v, phi, delta);
+}
+
+void calc_by_input_std_only_delta3() {
+    vector<double> v(3, 0), phi(3, 0), delta(3, 0);
+
+    // 電圧
+    for (int i = 0; i < PORT; ++i) {
+        cin >> v[i];
+    }
+
+    // 位相差
+    for (int i = 0; i < PORT; ++i) {
+        cin >> phi[i];
+    }
+    // ラジアンに変換
+    for (int i = 0; i < PORT; ++i) {
+        phi[i] *= M_PI / 180;
+    }
+
+    // ゼロ電圧動作区間
+    cin >> delta[2];
+    delta[2] *= M_PI / 180;
+    delta[0] = M_PI - (M_PI - delta[2]) * v[2] / v[0];
+    delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
+
+    calc(v, phi, delta);
+}
 
 int main() {
-    calc();
-
+//    calc_by_input_std();
+    calc_by_input_std_only_delta3();
     return 0;
 }
