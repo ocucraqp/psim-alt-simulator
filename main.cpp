@@ -8,8 +8,29 @@
 #include "cmdline.h"
 
 using namespace std;
+static const int MAX_DELTA = 180;
+static const int WIDTH_DELTA = 1;
 
-vector<double> phi_to_power(vector<double> v, vector<double> phi, vector<double> delta) {
+template<typename T>
+T max_vector(vector<T> v) {
+    double max_v = v[0];
+    for (int i = 1; i < v.size(); ++i) {
+        max_v = max(max_v, v[i]);
+    }
+    return max_v;
+}
+
+template<typename T>
+T avg_vector(vector<T> v) {
+    double avg_v = 0;
+    for (int i = 0; i < v.size(); ++i) {
+        avg_v += v[i];
+    }
+    avg_v /= v.size();
+    return avg_v;
+}
+
+vector<double> phi_to_power(vector<double> v, vector<double> delta, vector<double> phi) {
     double L_s = L[0] * L[1] + L[1] * L[2] + L[2] * L[0];
     double A = (4 * T_PERIOD) / (pow(M_PI, 3) * L_s);
     double A_0 = A * L[0] * v[0] * v[1] * cos(delta[0] / 2) * cos(delta[1] / 2);
@@ -20,13 +41,13 @@ vector<double> phi_to_power(vector<double> v, vector<double> phi, vector<double>
     p[1] = A_0 * sin(phi[1]) - A_2 * sin(phi[2] - phi[1]);
     p[2] = A_1 * sin(phi[2]) + A_2 * sin(phi[2] - phi[1]);
 
-    cout << "POWER" << endl;
-    cout << "PORT1:" << p[0] << ", PORT2: " << p[1] << ", PORT3: " << p[2] << endl;
+//    cout << "POWER" << endl;
+//    cout << "PORT1:" << p[0] << ", PORT2: " << p[1] << ", PORT3: " << p[2] << endl;
 
     return p;
 }
 
-vector<double> power_to_phi(vector<double> v, vector<double> p, vector<double> delta) {
+vector<double> power_to_phi(vector<double> v, vector<double> delta, vector<double> p) {
     vector<double> phi(PORT, 0);
     vector<double> v_delta(PORT);
     for (int i = 0; i < PORT; ++i) {
@@ -47,68 +68,154 @@ vector<double> power_to_phi(vector<double> v, vector<double> p, vector<double> d
     phi[1] = H[0] * p[1] / v[1] + H[1] * p[2] / v[2];
     phi[2] = H[2] * p[1] / v[1] + H[3] * p[2] / v[2];
 
-    cout << "phi" << endl;
-    cout << "phi1:" << phi[0] * 180 / M_PI << ", phi2: " << phi[1] * 180 / M_PI << ", phi3: " << phi[2] * 180 / M_PI
-         << endl;
+//    cout << "phi" << endl;
+//    cout << "phi1:" << phi[0] * 180 / M_PI << ", phi2: " << phi[1] * 180 / M_PI << ", phi3: " << phi[2] * 180 / M_PI
+//         << endl;
 
     return phi;
 }
 
-void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delta3_only = false) {
-    vector<double> v(PORT), p(PORT), phi(PORT), delta(PORT);
+vector<vector<vector<double>>> calc_delta3_for_min(AltSimulator alt_simulator, vector<double> v, vector<double> p) {
+    vector<vector<double>> min_avg_peak(3), min_max_peak(3), min_avg_rms(3), min_max_rms(3);
+    // ex.) min_avg_peak[0]:delta, min_avg_peak[1]:il_peak, min_avg_peak[2]:il_rms
+    min_avg_peak[1] = {1000, 1000, 1000};
+    min_avg_peak[2] = {1000, 1000, 1000};
+    min_max_peak[1] = {1000, 1000, 1000};
+    min_max_peak[2] = {1000, 1000, 1000};
+    min_avg_rms[1] = {1000, 1000, 1000};
+    min_avg_rms[2] = {1000, 1000, 1000};
+    min_max_rms[1] = {1000, 1000, 1000};
+    min_max_rms[2] = {1000, 1000, 1000};
+
+    for (int i = 0; i < MAX_DELTA; i += WIDTH_DELTA) {
+        vector<double> delta(PORT), phi(PORT);
+        delta[2] = i * M_PI / 180;
+        delta[0] = M_PI - (M_PI - delta[2]) * v[2] / v[0];
+        delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
+        phi = power_to_phi(v, delta, p);
+
+        alt_simulator.set_condition(v, delta, phi);
+        auto[il_peak, il_rms]=alt_simulator.calc(false);
+
+        // 旧データとの比較
+        if (avg_vector(il_peak) < avg_vector(min_avg_peak[1])) {
+            min_avg_peak[0] = delta;
+            min_avg_peak[1] = il_peak;
+            min_avg_peak[2] = il_rms;
+        }
+        if (max_vector(il_peak) < max_vector(min_max_peak[1])) {
+            min_max_peak[0] = delta;
+            min_max_peak[1] = il_peak;
+            min_max_peak[2] = il_rms;
+        }
+        if (avg_vector(il_rms) < avg_vector(min_avg_rms[2])) {
+            min_avg_rms[0] = delta;
+            min_avg_rms[1] = il_peak;
+            min_avg_rms[2] = il_rms;
+        }
+        if (max_vector(il_rms) < max_vector(min_max_rms[2])) {
+            min_max_rms[0] = delta;
+            min_max_rms[1] = il_peak;
+            min_max_rms[2] = il_rms;
+        }
+    }
+
+    return {min_avg_peak, min_max_peak, min_avg_rms, min_avg_rms};
+}
+
+void output_parameter(vector<vector<double>> min_delta) {
+    cout << "delta1:" << min_delta[0][0] * 180 / M_PI << ", delta2:" << min_delta[0][1] * 180 / M_PI
+         << ", delta3:" << min_delta[0][2] * 180 / M_PI << endl;
+    cout << "il1_peak:" << min_delta[1][0] << ", il2_peak:" << min_delta[1][1] << ", il3_peak:"
+         << min_delta[1][2] << endl;
+    cout << "il1_rms:" << min_delta[2][0] << ", il2_rms:" << min_delta[2][1] << ", il3_rms:"
+         << min_delta[2][2] << endl;
+}
+
+string output_parameter_to_csv(vector<vector<double>> min_delta) {
+    string output = to_string(min_delta[0][0] * 180 / M_PI) + "," + to_string(min_delta[0][1] * 180 / M_PI) + "," +
+                    to_string(min_delta[0][2] * 180 / M_PI)
+                    + "," + to_string(min_delta[1][0]) + "," + to_string(min_delta[2][0]) + "," +
+                    to_string(min_delta[1][1]) + "," + to_string(min_delta[2][1])
+                    + "," + to_string(min_delta[1][2]) + "," + to_string(min_delta[2][2]) + '\n';
+    return output;
+}
+
+void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delta3_only = false, bool min = false) {
+    vector<double> v(PORT), delta(PORT), p(PORT), phi(PORT);
 
     // 電圧
     for (int i = 0; i < PORT; ++i) {
         cin >> v[i];
     }
 
-    // 電圧or位相差
-    if (power) {
+    if (min) {
         for (int i = 0; i < PORT; ++i) {
             cin >> p[i];
         }
-        // ラジアンに変換
-        for (int i = 0; i < PORT; ++i) {
-            p[i] *= M_PI / 180;
-        }
-        phi = power_to_phi(v, p, delta);
+        vector<vector<vector<double>>> min_delta = calc_delta3_for_min(alt_simulator, v, p);
+        cout << "min avg peak:" << endl;
+        output_parameter(min_delta[0]);
+        cout << "min max peak:" << endl;
+        output_parameter(min_delta[1]);
+        cout << "min avg rms:" << endl;
+        output_parameter(min_delta[2]);
+        cout << "min max rms:" << endl;
+        output_parameter(min_delta[3]);
     } else {
-        for (int i = 0; i < PORT; ++i) {
-            cin >> phi[i];
+        // ゼロ電圧動作区間
+        if (delta3_only) {
+            cin >> delta[2];
+            delta[2] *= M_PI / 180;
+            delta[0] = M_PI - (M_PI - delta[2]) * v[2] / v[0];
+            delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
+        } else {
+            for (int i = 0; i < PORT; ++i) {
+                cin >> delta[i];
+            }
+            // ラジアンに変換
+            for (int i = 0; i < PORT; ++i) {
+                delta[i] *= M_PI / 180;
+            }
         }
-        // ラジアンに変換
-        for (int i = 0; i < PORT; ++i) {
-            phi[i] *= M_PI / 180;
-        }
-    }
 
-    // ゼロ電圧動作区間
-    if (delta3_only) {
-        cin >> delta[2];
-        delta[2] *= M_PI / 180;
-        delta[0] = M_PI - (M_PI - delta[2]) * v[2] / v[0];
-        delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
-    } else {
-        for (int i = 0; i < PORT; ++i) {
-            cin >> delta[i];
+        // 電圧or位相差
+        if (power) {
+            for (int i = 0; i < PORT; ++i) {
+                cin >> p[i];
+            }
+            // ラジアンに変換
+            for (int i = 0; i < PORT; ++i) {
+                p[i] *= M_PI / 180;
+            }
+            phi = power_to_phi(v, delta, p);
+        } else {
+            for (int i = 0; i < PORT; ++i) {
+                cin >> phi[i];
+            }
+            // ラジアンに変換
+            for (int i = 0; i < PORT; ++i) {
+                phi[i] *= M_PI / 180;
+            }
         }
-        // ラジアンに変換
-        for (int i = 0; i < PORT; ++i) {
-            delta[i] *= M_PI / 180;
-        }
-    }
 
-    alt_simulator.set_condition(v, phi, delta);
-    alt_simulator.calc();
+        alt_simulator.set_condition(v, delta, phi);
+        alt_simulator.calc(true);
+    }
 }
 
-void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename, const string &output_filename,
-                       bool power = false,
-                       bool delta3_only = false) {
+void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename, bool power = false,
+                       bool delta3_only = false, bool min = false) {
     string str_buf;
     string str_conma_buf;
     ifstream ifs_csv_file(input_filename);
-    ofstream ofs_csv_file(output_filename);
+
+    string output_filename = "output";
+    ofstream ofs_csv_file(output_filename + ".csv");
+    ofstream ofs_csv_file_avg_peak(output_filename + "_avg_peak.csv");
+    ofstream ofs_csv_file_max_peak(output_filename + "_max_peak.csv");
+    ofstream ofs_csv_file_avg_rms(output_filename + "_avg_rms.csv");
+    ofstream ofs_csv_file_max_rms(output_filename + "_max_rms.csv");
 
     while (getline(ifs_csv_file, str_buf)) {
         vector<double> v(PORT), p(PORT), phi(PORT), delta(PORT);
@@ -118,54 +225,80 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
         // 電圧
         for (int i = 0; i < PORT; ++i) {
             getline(i_stream, str_conma_buf, ',');
+            if (min) {
+                ofs_csv_file_avg_peak << str_conma_buf << ',';
+                ofs_csv_file_max_peak << str_conma_buf << ',';
+                ofs_csv_file_avg_rms << str_conma_buf << ',';
+                ofs_csv_file_max_rms << str_conma_buf << ',';
+            } else {
+                ofs_csv_file << str_conma_buf << ',';
+            }
             v[i] = stod(str_conma_buf);
         }
 
-        // 電圧or位相差
-        if (power) {
+        if (min) {
             for (int i = 0; i < PORT; ++i) {
                 getline(i_stream, str_conma_buf, ',');
+                ofs_csv_file_avg_peak << str_conma_buf << ',';
+                ofs_csv_file_max_peak << str_conma_buf << ',';
+                ofs_csv_file_avg_rms << str_conma_buf << ',';
+                ofs_csv_file_max_rms << str_conma_buf << ',';
                 p[i] = stod(str_conma_buf);
             }
-            // ラジアンに変換
-            for (int i = 0; i < PORT; ++i) {
-                p[i] *= M_PI / 180;
-            }
-            phi = power_to_phi(v, p, delta);
+            vector<vector<vector<double>>> min_delta = calc_delta3_for_min(alt_simulator, v, p);
+            ofs_csv_file_avg_peak << output_parameter_to_csv(min_delta[0]);
+            ofs_csv_file_max_peak << output_parameter_to_csv(min_delta[1]);
+            ofs_csv_file_avg_rms << output_parameter_to_csv(min_delta[2]);
+            ofs_csv_file_max_rms << output_parameter_to_csv(min_delta[3]);
         } else {
-            for (int i = 0; i < PORT; ++i) {
-                getline(i_stream, str_conma_buf, ',');
-                phi[i] = stod(str_conma_buf);
-            }
-            // ラジアンに変換
-            for (int i = 0; i < PORT; ++i) {
-                phi[i] *= M_PI / 180;
-            }
-        }
-
-        // ゼロ電圧動作区間
-        if (delta3_only) {
-            getline(i_stream, str_conma_buf, ',');
-            delta[2] = stod(str_conma_buf);
-            delta[2] *= M_PI / 180;
-            delta[0] = M_PI - (M_PI - delta[2]) * v[2] / v[0];
-            delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
-        } else {
+            // ゼロ電圧動作区間
             for (int i = 0; i < PORT; ++i) {
                 getline(i_stream, str_conma_buf, ',');
                 delta[i] = stod(str_conma_buf);
             }
             // ラジアンに変換
-            for (int i = 0; i < PORT; ++i) {
-                delta[i] *= M_PI / 180;
+            if (delta3_only) {
+                delta[2] *= M_PI / 180;
+                delta[0] = M_PI - (M_PI - delta[2]) * v[2] / v[0];
+                delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
+            } else {
+                for (int i = 0; i < PORT; ++i) {
+                    delta[i] *= M_PI / 180;
+                }
             }
+            ofs_csv_file << delta[0] * 180 / M_PI << ',' << delta[1] * 180 / M_PI << ',' << delta[2] * 180 / M_PI
+                         << ',';
+
+            // 電圧or位相差
+            if (power) {
+                for (int i = 0; i < PORT; ++i) {
+                    getline(i_stream, str_conma_buf, ',');
+                    ofs_csv_file << str_conma_buf << ',';
+                    p[i] = stod(str_conma_buf);
+                }
+                // ラジアンに変換
+                for (int i = 0; i < PORT; ++i) {
+                    p[i] *= M_PI / 180;
+                }
+                phi = power_to_phi(v, delta, p);
+            } else {
+                for (int i = 0; i < PORT; ++i) {
+                    getline(i_stream, str_conma_buf, ',');
+                    ofs_csv_file << str_conma_buf << ',';
+                    phi[i] = stod(str_conma_buf);
+                }
+                // ラジアンに変換
+                for (int i = 0; i < PORT; ++i) {
+                    phi[i] *= M_PI / 180;
+                }
+            }
+
+            alt_simulator.set_condition(v, delta, phi);
+            auto[il_peak, il_rms] = alt_simulator.calc(false);
+
+            ofs_csv_file << il_peak[0] << "," << il_rms[0] << "," << il_peak[1] << "," << il_rms[1] << "," << il_peak[2]
+                         << "," << il_rms[2] << endl;
         }
-
-        alt_simulator.set_condition(v, phi, delta);
-        alt_simulator.calc();
-
-        ofs_csv_file << str_conma_buf << ',';
-        ofs_csv_file << std::endl;
     }
 }
 
@@ -174,9 +307,9 @@ int main(int argc, char *argv[]) {
     // コマンドライン引数の処理
     cmdline::parser parser;
     parser.add<string>("file", 'f', "input file name", false, "input.csv");
-    parser.add<string>("output", 'o', "output file name", false, "output.csv");
     parser.add("power", 'p', "power");
     parser.add("delta3", 'd', "delta3 only");
+    parser.add("min", 'm', "min");
     parser.parse_check(argc, argv);
 
     if (!parser.parse(argc, argv) || parser.exist("help")) {
@@ -187,10 +320,10 @@ int main(int argc, char *argv[]) {
     AltSimulator alt_simulator;
 
     if (parser.exist("file")) {
-        calc_by_input_csv(alt_simulator, parser.get<string>("file"), parser.get<string>("output"),
-                          parser.exist("power"), parser.exist("delta3"));
+        calc_by_input_csv(alt_simulator, parser.get<string>("file"), parser.exist("power"), parser.exist("delta3"),
+                          parser.exist("min"));
     } else {
-        calc_by_input_std(alt_simulator, parser.exist("power"), parser.exist("delta3"));
+        calc_by_input_std(alt_simulator, parser.exist("power"), parser.exist("delta3"), parser.exist("min"));
     }
 
     return 0;

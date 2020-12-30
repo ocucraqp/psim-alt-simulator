@@ -23,7 +23,7 @@ static const double T_PERIOD = 1 / F_SW;
 static const int PARTITION_N = 1000;
 
 class AltSimulator {
-    vector<double> v, phi, delta;
+    vector<double> v, delta, phi;
     // T: vector<pair<時間，ポート番号>>
     vector<pair<double, int>> T;
     // ui: vector<vector<pair<電圧，時間>>>
@@ -40,7 +40,7 @@ class AltSimulator {
     vector<double> il_rms;
 
 public:
-    void set_condition(vector<double> input_v, vector<double> input_phi, vector<double> input_delta);
+    void set_condition(vector<double> input_v, vector<double> input_delta, vector<double> input_phi);
 
     void calc_timing();
 
@@ -58,7 +58,7 @@ public:
 
     void calc_il_rms();
 
-    void calc();
+    pair<vector<double>, vector<double>> calc(bool is_output);
 };
 
 #endif //ALT_SIMULATOR_ALT_SIMULATOR_H

@@ -1,9 +1,9 @@
 #include "alt_simulator.h"
 
-void AltSimulator::set_condition(vector<double> input_v, vector<double> input_phi, vector<double> input_delta) {
+void AltSimulator::set_condition(vector<double> input_v, vector<double> input_delta, vector<double> input_phi) {
     v = input_v;
-    phi = input_phi;
     delta = input_delta;
+    phi = input_phi;
 }
 
 void AltSimulator::calc_timing() {
@@ -175,7 +175,7 @@ void AltSimulator::calc_il_rms() {
     }
 }
 
-void AltSimulator::calc() {
+pair<vector<double>, vector<double>> AltSimulator::calc(bool is_output) {
     calc_timing();
     calc_ui();
     calc_ut();
@@ -184,16 +184,19 @@ void AltSimulator::calc() {
     calc_il_peak();
     calc_il_rms();
 
-    // output
-    cout << "Input" << endl;
-    cout << "V1:" << v[0] << ", V2:" << v[1] << ", V3:" << v[2] << endl;
-    cout << "phi1:" << phi[0] * 180 / M_PI << ", phi2:" << phi[1] * 180 / M_PI << ", phi3:" << phi[2] * 180 / M_PI
-         << endl;
-    cout << "delta1:" << delta[0] * 180 / M_PI << ", delta2:" << delta[1] * 180 / M_PI << ", delta3:"
-         << delta[2] * 180 / M_PI << endl;
-    cout << endl << "Output" << endl;
-    cout << "il1_peak:" << il_peak[0] << ", il2_peak:" << il_peak[1] << ", il3_peak:" << il_peak[2] << endl;
-    cout << "il1_rms:" << il_rms[0] << ", il2_rms:" << il_rms[1] << ", il3_rms:" << il_rms[2] << endl;
-    cout << endl;
+    if (is_output) {
+        // output
+        cout << "Input" << endl;
+        cout << "V1:" << v[0] << ", V2:" << v[1] << ", V3:" << v[2] << endl;
+        cout << "phi1:" << phi[0] * 180 / M_PI << ", phi2:" << phi[1] * 180 / M_PI << ", phi3:" << phi[2] * 180 / M_PI
+             << endl;
+        cout << "delta1:" << delta[0] * 180 / M_PI << ", delta2:" << delta[1] * 180 / M_PI << ", delta3:"
+             << delta[2] * 180 / M_PI << endl;
+        cout << endl << "Output" << endl;
+        cout << "il1_peak:" << il_peak[0] << ", il2_peak:" << il_peak[1] << ", il3_peak:" << il_peak[2] << endl;
+        cout << "il1_rms:" << il_rms[0] << ", il2_rms:" << il_rms[1] << ", il3_rms:" << il_rms[2] << endl;
+        cout << endl;
+    }
 
+    return {il_peak, il_rms};
 }
