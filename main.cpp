@@ -305,10 +305,12 @@ void phi_to_p_by_input() {
     for (int i = 0; i < PORT; ++i) {
         cout << "delta[" << i << "]:";
         cin >> delta[i];
+        delta[i]*=M_PI/180;
     }
     for (int i = 0; i < PORT; ++i) {
         cout << "phi[" << i << "]:";
         cin >> phi[i];
+        phi[i]*=M_PI/180;
     }
 
     p = phi_to_power(v, delta, phi);
@@ -327,10 +329,11 @@ void p_to_phi_by_input() {
     for (int i = 0; i < PORT; ++i) {
         cout << "delta[" << i << "]:";
         cin >> delta[i];
+        delta[i]*=M_PI/180;
     }
     for (int i = 0; i < PORT; ++i) {
         cout << "p[" << i << "]:";
-        cin >> phi[i];
+        cin >> p[i];
     }
 
     phi = power_to_phi(v, delta, p);
@@ -343,40 +346,46 @@ void p_to_phi_by_input() {
 int main(int argc, char *argv[]) {
 
     // コマンドの確認
-    if (!strcmp(argv[1], "phitop")) {
-        phi_to_p_by_input();
-    } else if (!strcmp(argv[1], "ptophi")) {
-        p_to_phi_by_input();
-    } else if (!strcmp(argv[1], "calc")) {
-        // オプションを定義
-        cmdline::parser parser;
-        parser.add<string>("file", 'f', "input file name", false, "input.csv");
-        parser.add("power", 'p', "power");
-        parser.add("delta3", 'd', "delta3 only");
-        parser.add("min", 'm', "min");
+    if (argc >= 1) {
+        if (!strcmp(argv[1], "phitop")) {
+            phi_to_p_by_input();
+            return 0;
+        } else if (!strcmp(argv[1], "ptophi")) {
+            p_to_phi_by_input();
+            return 0;
+        } else if (!strcmp(argv[1], "calc")) {
+            // オプションを定義
+            cmdline::parser parser;
+            parser.add<string>("file", 'f', "input file name", false, "input.csv");
+            parser.add("power", 'p', "power");
+            parser.add("delta3", 'd', "delta3 only");
+            parser.add("min", 'm', "min");
 
-        // オプションの処理
-        parser.parse_check(argc, argv);
-        if (!parser.parse(argc, argv) || parser.exist("help")) {
-            std::cout << parser.error_full() << parser.usage();
+            // オプションの処理
+            parser.parse_check(argc, argv);
+            if (!parser.parse(argc, argv) || parser.exist("help")) {
+                std::cout << parser.error_full() << parser.usage();
+                return 0;
+            }
+
+            AltSimulator alt_simulator;
+
+            // ファイルor標準入力による分岐
+            if (parser.exist("file")) {
+                calc_by_input_csv(alt_simulator, parser.get<string>("file"), parser.exist("power"),
+                                  parser.exist("delta3"),
+                                  parser.exist("min"));
+            } else {
+                calc_by_input_std(alt_simulator, parser.exist("power"), parser.exist("delta3"), parser.exist("min"));
+            }
             return 0;
         }
-
-        AltSimulator alt_simulator;
-
-        // ファイルor標準入力による分岐
-        if (parser.exist("file")) {
-            calc_by_input_csv(alt_simulator, parser.get<string>("file"), parser.exist("power"), parser.exist("delta3"),
-                              parser.exist("min"));
-        } else {
-            calc_by_input_std(alt_simulator, parser.exist("power"), parser.exist("delta3"), parser.exist("min"));
-        }
-    } else {
-        cout << "Please input command." << endl;
-        cout << "- calc: Calculate il." << endl;
-        cout << "- phitop: Calculate power from phase difference." << endl;
-        cout << "- ptophi: Calculate phase difference from power." << endl;
     }
+
+    cout << "Please input command." << endl;
+    cout << "- calc: Calculate il." << endl;
+    cout << "- phitop: Calculate power from phase difference." << endl;
+    cout << "- ptophi: Calculate phase difference from power." << endl;
 
     return 0;
 }
