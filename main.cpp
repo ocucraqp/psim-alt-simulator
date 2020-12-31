@@ -9,7 +9,7 @@
 
 using namespace std;
 static const int MAX_DELTA = 180;
-static const int WIDTH_DELTA = 1;
+static const int WIDTH_DELTA = 10;
 
 template<typename T>
 T max_vector(vector<T> v) {
@@ -41,9 +41,6 @@ vector<double> phi_to_power(vector<double> v, vector<double> delta, vector<doubl
     p[1] = A_0 * sin(phi[1]) - A_2 * sin(phi[2] - phi[1]);
     p[2] = A_1 * sin(phi[2]) + A_2 * sin(phi[2] - phi[1]);
 
-//    cout << "POWER" << endl;
-//    cout << "PORT1:" << p[0] << ", PORT2: " << p[1] << ", PORT3: " << p[2] << endl;
-
     return p;
 }
 
@@ -67,10 +64,6 @@ vector<double> power_to_phi(vector<double> v, vector<double> delta, vector<doubl
     H[3] = G_c * G[0];
     phi[1] = H[0] * p[1] / v[1] + H[1] * p[2] / v[2];
     phi[2] = H[2] * p[1] / v[1] + H[3] * p[2] / v[2];
-
-//    cout << "phi" << endl;
-//    cout << "phi1:" << phi[0] * 180 / M_PI << ", phi2: " << phi[1] * 180 / M_PI << ", phi3: " << phi[2] * 180 / M_PI
-//         << endl;
 
     return phi;
 }
@@ -302,28 +295,87 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
     }
 }
 
+void phi_to_p_by_input() {
+    vector<double> v(PORT), delta(PORT), phi(PORT), p(PORT);
 
-int main(int argc, char *argv[]) {
-    // コマンドライン引数の処理
-    cmdline::parser parser;
-    parser.add<string>("file", 'f', "input file name", false, "input.csv");
-    parser.add("power", 'p', "power");
-    parser.add("delta3", 'd', "delta3 only");
-    parser.add("min", 'm', "min");
-    parser.parse_check(argc, argv);
-
-    if (!parser.parse(argc, argv) || parser.exist("help")) {
-        std::cout << parser.error_full() << parser.usage();
-        return 0;
+    for (int i = 0; i < PORT; ++i) {
+        cout << "v[" << i << "]:";
+        cin >> v[i];
+    }
+    for (int i = 0; i < PORT; ++i) {
+        cout << "delta[" << i << "]:";
+        cin >> delta[i];
+    }
+    for (int i = 0; i < PORT; ++i) {
+        cout << "phi[" << i << "]:";
+        cin >> phi[i];
     }
 
-    AltSimulator alt_simulator;
+    p = phi_to_power(v, delta, phi);
 
-    if (parser.exist("file")) {
-        calc_by_input_csv(alt_simulator, parser.get<string>("file"), parser.exist("power"), parser.exist("delta3"),
-                          parser.exist("min"));
+    cout << "POWER" << endl;
+    cout << "PORT1:" << p[0] << ", PORT2: " << p[1] << ", PORT3: " << p[2] << endl;
+}
+
+void p_to_phi_by_input() {
+    vector<double> v(PORT), delta(PORT), phi(PORT), p(PORT);
+
+    for (int i = 0; i < PORT; ++i) {
+        cout << "v[" << i << "]:";
+        cin >> v[i];
+    }
+    for (int i = 0; i < PORT; ++i) {
+        cout << "delta[" << i << "]:";
+        cin >> delta[i];
+    }
+    for (int i = 0; i < PORT; ++i) {
+        cout << "p[" << i << "]:";
+        cin >> phi[i];
+    }
+
+    phi = power_to_phi(v, delta, p);
+
+    cout << "phi" << endl;
+    cout << "phi1:" << phi[0] * 180 / M_PI << ", phi2: " << phi[1] * 180 / M_PI << ", phi3: " << phi[2] * 180 / M_PI
+         << endl;
+}
+
+int main(int argc, char *argv[]) {
+
+    // コマンドの確認
+    if (!strcmp(argv[1], "phitop")) {
+        phi_to_p_by_input();
+    } else if (!strcmp(argv[1], "ptophi")) {
+        p_to_phi_by_input();
+    } else if (!strcmp(argv[1], "calc")) {
+        // オプションを定義
+        cmdline::parser parser;
+        parser.add<string>("file", 'f', "input file name", false, "input.csv");
+        parser.add("power", 'p', "power");
+        parser.add("delta3", 'd', "delta3 only");
+        parser.add("min", 'm', "min");
+
+        // オプションの処理
+        parser.parse_check(argc, argv);
+        if (!parser.parse(argc, argv) || parser.exist("help")) {
+            std::cout << parser.error_full() << parser.usage();
+            return 0;
+        }
+
+        AltSimulator alt_simulator;
+
+        // ファイルor標準入力による分岐
+        if (parser.exist("file")) {
+            calc_by_input_csv(alt_simulator, parser.get<string>("file"), parser.exist("power"), parser.exist("delta3"),
+                              parser.exist("min"));
+        } else {
+            calc_by_input_std(alt_simulator, parser.exist("power"), parser.exist("delta3"), parser.exist("min"));
+        }
     } else {
-        calc_by_input_std(alt_simulator, parser.exist("power"), parser.exist("delta3"), parser.exist("min"));
+        cout << "Please input command." << endl;
+        cout << "- calc: Calculate il." << endl;
+        cout << "- phitop: Calculate power from phase difference." << endl;
+        cout << "- ptophi: Calculate phase difference from power." << endl;
     }
 
     return 0;
