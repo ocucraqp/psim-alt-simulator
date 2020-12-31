@@ -9,7 +9,7 @@
 
 using namespace std;
 static const int MAX_DELTA = 180;
-static const int WIDTH_DELTA = 10;
+static const int WIDTH_DELTA = 1;
 
 template<typename T>
 T max_vector(vector<T> v) {
@@ -92,24 +92,16 @@ vector<vector<vector<double>>> calc_delta3_for_min(AltSimulator alt_simulator, v
 
         // 旧データとの比較
         if (avg_vector(il_peak) < avg_vector(min_avg_peak[1])) {
-            min_avg_peak[0] = delta;
-            min_avg_peak[1] = il_peak;
-            min_avg_peak[2] = il_rms;
+            min_avg_peak = {delta, il_peak, il_rms};
         }
         if (max_vector(il_peak) < max_vector(min_max_peak[1])) {
-            min_max_peak[0] = delta;
-            min_max_peak[1] = il_peak;
-            min_max_peak[2] = il_rms;
+            min_max_peak = {delta, il_peak, il_rms};
         }
         if (avg_vector(il_rms) < avg_vector(min_avg_rms[2])) {
-            min_avg_rms[0] = delta;
-            min_avg_rms[1] = il_peak;
-            min_avg_rms[2] = il_rms;
+            min_avg_rms = {delta, il_peak, il_rms};
         }
         if (max_vector(il_rms) < max_vector(min_max_rms[2])) {
-            min_max_rms[0] = delta;
-            min_max_rms[1] = il_peak;
-            min_max_rms[2] = il_rms;
+            min_max_rms = {delta, il_peak, il_rms};
         }
     }
 
@@ -139,11 +131,14 @@ void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delt
 
     // 電圧
     for (int i = 0; i < PORT; ++i) {
+        cout << "v[" << i << "]:";
         cin >> v[i];
     }
 
+    // 最小ピーク電流のdeltaを計算
     if (min) {
         for (int i = 0; i < PORT; ++i) {
+            cout << "p[" << i << "]:";
             cin >> p[i];
         }
         vector<vector<vector<double>>> min_delta = calc_delta3_for_min(alt_simulator, v, p);
@@ -158,12 +153,14 @@ void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delt
     } else {
         // ゼロ電圧動作区間
         if (delta3_only) {
+            cout << "delta[" << 2 << "]:";
             cin >> delta[2];
             delta[2] *= M_PI / 180;
             delta[0] = M_PI - (M_PI - delta[2]) * v[2] / v[0];
             delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
         } else {
             for (int i = 0; i < PORT; ++i) {
+                cout << "delta[" << i << "]:";
                 cin >> delta[i];
             }
             // ラジアンに変換
@@ -175,6 +172,7 @@ void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delt
         // 電圧or位相差
         if (power) {
             for (int i = 0; i < PORT; ++i) {
+                cout << "p[" << i << "]:";
                 cin >> p[i];
             }
             // ラジアンに変換
@@ -184,6 +182,7 @@ void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delt
             phi = power_to_phi(v, delta, p);
         } else {
             for (int i = 0; i < PORT; ++i) {
+                cout << "phi[" << i << "]:";
                 cin >> phi[i];
             }
             // ラジアンに変換
@@ -229,6 +228,7 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
             v[i] = stod(str_conma_buf);
         }
 
+        // 最小ピーク電流のdeltaを計算
         if (min) {
             for (int i = 0; i < PORT; ++i) {
                 getline(i_stream, str_conma_buf, ',');
