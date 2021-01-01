@@ -50,7 +50,6 @@ phi[1]:39
 phi[2]:33
 POWER
 PORT1:1864.78, PORT2: 1202.39, PORT3: 662.386
-
 ```
 
 ### ptophi: Calculate phase difference from power.
@@ -68,6 +67,28 @@ p[1]:1300
 p[2]:700
 phi
 phi1:0, phi2: 39.1761, phi3: 32.9122
+```
+
+### dataset: Make dataset;
+
+```bash
+$ ./alt_simulator dataset
+filename:input_auto.csv
+v[0] min  :400
+v[0] max  :400
+v[0] width:10
+v[1] min  :200
+v[1] max  :400
+v[1] width:10
+v[2] min  :200
+v[2] max  :400
+v[2] width:10
+p[1] min  :0
+p[1] max  :2000
+p[1] width:100
+p[2] min  :0
+p[2] max  :2000
+p[2] width:100
 
 ```
 

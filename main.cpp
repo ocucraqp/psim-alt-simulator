@@ -3,9 +3,9 @@
 #include <cstdlib>
 #include <string>
 #include <fstream>
-#include <sstream>
 #include "alt_simulator.h"
 #include "cmdline.h"
+#include "make_dataset.h"
 
 using namespace std;
 static const int MAX_DELTA = 180;
@@ -352,6 +352,9 @@ int main(int argc, char *argv[]) {
             return 0;
         } else if (!strcmp(argv[1], "ptophi")) {
             p_to_phi_by_input();
+            return 0;
+        } else if (!strcmp(argv[1], "dataset")) {
+            make_dataset();
             return 0;
         } else if (!strcmp(argv[1], "calc")) {
             // オプションを定義

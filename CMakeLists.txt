@@ -3,4 +3,4 @@ project(alt_simulator)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(alt_simulator main.cpp alt_simulator.cpp)
+add_executable(alt_simulator main.cpp alt_simulator.cpp make_dataset.cpp)

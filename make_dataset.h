@@ -1,0 +1,6 @@
+#ifndef ALT_SIMULATOR_MAKE_DATASET_H
+#define ALT_SIMULATOR_MAKE_DATASET_H
+
+void make_dataset();
+
+#endif //ALT_SIMULATOR_MAKE_DATASET_H
