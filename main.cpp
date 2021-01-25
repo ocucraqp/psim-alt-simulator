@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <string>
 #include <fstream>
+#include <random>
 #include "alt_simulator.h"
 #include "cmdline.h"
 #include "make_dataset.h"
@@ -295,6 +296,39 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
     }
 }
 
+void calc_by_rondom(AltSimulator alt_simulator, const string &input_filename, int random_n = 100) {
+    string output_filename = "output_random";
+    ofstream ofs_csv_file(output_filename + ".csv");
+    ofstream ofs_csv_file_avg_peak(output_filename + "_avg_peak.csv");
+    ofstream ofs_csv_file_max_peak(output_filename + "_max_peak.csv");
+    ofstream ofs_csv_file_avg_rms(output_filename + "_avg_rms.csv");
+    ofstream ofs_csv_file_max_rms(output_filename + "_max_rms.csv");
+
+    // 乱数生成器
+    mt19937 mt(random_device{}());
+    uniform_real_distribution<double> dist_v(200, 400);
+    uniform_real_distribution<double> dist_p23(1, 2000);
+
+    for (int i = 0; i < random_n; i++) {
+        vector<double> v(PORT), p(PORT);
+        // 電圧
+        for (int j = 0; j < PORT; ++j) {
+            v[i] = dist_v(mt);
+        }
+
+        // 最小ピーク電流のdeltaを計算
+        p[1] = dist_p23(mt);
+        p[2] = dist_p23(mt);
+        p[0] = p[1] + p[2];
+
+        vector<vector<vector<double>>> min_delta = calc_delta3_for_min(alt_simulator, v, p);
+        ofs_csv_file_avg_peak << output_parameter_to_csv(min_delta[0]);
+        ofs_csv_file_max_peak << output_parameter_to_csv(min_delta[1]);
+        ofs_csv_file_avg_rms << output_parameter_to_csv(min_delta[2]);
+        ofs_csv_file_max_rms << output_parameter_to_csv(min_delta[3]);
+    }
+}
+
 void phi_to_p_by_input() {
     vector<double> v(PORT), delta(PORT), phi(PORT), p(PORT);
 
@@ -305,12 +339,12 @@ void phi_to_p_by_input() {
     for (int i = 0; i < PORT; ++i) {
         cout << "delta[" << i << "]:";
         cin >> delta[i];
-        delta[i]*=M_PI/180;
+        delta[i] *= M_PI / 180;
     }
     for (int i = 0; i < PORT; ++i) {
         cout << "phi[" << i << "]:";
         cin >> phi[i];
-        phi[i]*=M_PI/180;
+        phi[i] *= M_PI / 180;
     }
 
     p = phi_to_power(v, delta, phi);
@@ -329,7 +363,7 @@ void p_to_phi_by_input() {
     for (int i = 0; i < PORT; ++i) {
         cout << "delta[" << i << "]:";
         cin >> delta[i];
-        delta[i]*=M_PI/180;
+        delta[i] *= M_PI / 180;
     }
     for (int i = 0; i < PORT; ++i) {
         cout << "p[" << i << "]:";
