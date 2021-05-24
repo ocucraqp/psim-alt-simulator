@@ -176,10 +176,6 @@ void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delt
                 cout << "p[" << i << "]:";
                 cin >> p[i];
             }
-            // ラジアンに変換
-            for (int i = 0; i < PORT; ++i) {
-                p[i] *= M_PI / 180;
-            }
             phi = power_to_phi(v, delta, p);
         } else {
             for (int i = 0; i < PORT; ++i) {
@@ -269,10 +265,6 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
                     getline(i_stream, str_conma_buf, ',');
                     ofs_csv_file << str_conma_buf << ',';
                     p[i] = stod(str_conma_buf);
-                }
-                // ラジアンに変換
-                for (int i = 0; i < PORT; ++i) {
-                    p[i] *= M_PI / 180;
                 }
                 phi = power_to_phi(v, delta, p);
             } else {
