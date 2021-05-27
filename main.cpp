@@ -70,16 +70,24 @@ vector<double> power_to_phi(vector<double> v, vector<double> delta, vector<doubl
 }
 
 vector<vector<vector<double>>> calc_delta3_for_min(AltSimulator alt_simulator, vector<double> v, vector<double> p) {
-    vector<vector<double>> min_avg_peak(3), min_max_peak(3), min_avg_rms(3), min_max_rms(3);
-    // ex.) min_avg_peak[0]:delta, min_avg_peak[1]:il_peak, min_avg_peak[2]:il_rms
-    min_avg_peak[1] = {1000, 1000, 1000};
+    vector<vector<double>> min_avg_peak(4), min_max_peak(4), min_avg_rms(4), min_max_rms(4);
+    // ex.) min_avg_peak[0]:delta, min_avg_peak[1]:phi, min_avg_peak[2]:il_peak, min_avg_peak[3]:il_rms
+    min_avg_peak[0] = {0, 0, 0};
+    min_avg_peak[1] = {0, 0, 0};
     min_avg_peak[2] = {1000, 1000, 1000};
-    min_max_peak[1] = {1000, 1000, 1000};
+    min_avg_peak[3] = {1000, 1000, 1000};
+    min_max_peak[0] = {0, 0, 0};
+    min_max_peak[1] = {0, 0, 0};
     min_max_peak[2] = {1000, 1000, 1000};
-    min_avg_rms[1] = {1000, 1000, 1000};
+    min_max_peak[3] = {1000, 1000, 1000};
+    min_avg_rms[0] = {0, 0, 0};
+    min_avg_rms[1] = {0, 0, 0};
     min_avg_rms[2] = {1000, 1000, 1000};
-    min_max_rms[1] = {1000, 1000, 1000};
+    min_avg_rms[3] = {1000, 1000, 1000};
+    min_max_rms[0] = {0, 0, 0};
+    min_max_rms[1] = {0, 0, 0};
     min_max_rms[2] = {1000, 1000, 1000};
+    min_max_rms[3] = {1000, 1000, 1000};
 
     for (int i = 0; i < MAX_DELTA; i += WIDTH_DELTA) {
         vector<double> delta(PORT), phi(PORT);
@@ -88,21 +96,23 @@ vector<vector<vector<double>>> calc_delta3_for_min(AltSimulator alt_simulator, v
         delta[1] = M_PI - (M_PI - delta[2]) * v[2] / v[1];
         phi = power_to_phi(v, delta, p);
 
-        alt_simulator.set_condition(v, delta, phi);
-        auto[il_peak, il_rms]=alt_simulator.calc(false);
+        if (phi[1] * 180 / M_PI <= 60 && phi[2] * 180 / M_PI <= 60) {
+            alt_simulator.set_condition(v, delta, phi);
+            auto[il_peak, il_rms]=alt_simulator.calc(false);
 
-        // 旧データとの比較
-        if (avg_vector(il_peak) < avg_vector(min_avg_peak[1])) {
-            min_avg_peak = {delta, il_peak, il_rms};
-        }
-        if (max_vector(il_peak) < max_vector(min_max_peak[1])) {
-            min_max_peak = {delta, il_peak, il_rms};
-        }
-        if (avg_vector(il_rms) < avg_vector(min_avg_rms[2])) {
-            min_avg_rms = {delta, il_peak, il_rms};
-        }
-        if (max_vector(il_rms) < max_vector(min_max_rms[2])) {
-            min_max_rms = {delta, il_peak, il_rms};
+            // 旧データとの比較
+            if (avg_vector(il_peak) < avg_vector(min_avg_peak[2])) {
+                min_avg_peak = {delta, phi, il_peak, il_rms};
+            }
+            if (max_vector(il_peak) < max_vector(min_max_peak[2])) {
+                min_max_peak = {delta, phi, il_peak, il_rms};
+            }
+            if (avg_vector(il_rms) < avg_vector(min_avg_rms[3])) {
+                min_avg_rms = {delta, phi, il_peak, il_rms};
+            }
+            if (max_vector(il_rms) < max_vector(min_max_rms[3])) {
+                min_max_rms = {delta, phi, il_peak, il_rms};
+            }
         }
     }
 
@@ -112,20 +122,25 @@ vector<vector<vector<double>>> calc_delta3_for_min(AltSimulator alt_simulator, v
 void output_parameter(vector<vector<double>> min_delta) {
     cout << "delta1:" << min_delta[0][0] * 180 / M_PI << ", delta2:" << min_delta[0][1] * 180 / M_PI
          << ", delta3:" << min_delta[0][2] * 180 / M_PI << endl;
-    cout << "il1_peak:" << min_delta[1][0] << ", il2_peak:" << min_delta[1][1] << ", il3_peak:"
-         << min_delta[1][2] << endl;
-    cout << "il1_rms:" << min_delta[2][0] << ", il2_rms:" << min_delta[2][1] << ", il3_rms:"
+    cout << "phi1:" << min_delta[1][0] * 180 / M_PI << ", phi2:" << min_delta[1][1] * 180 / M_PI
+         << ", phi3:" << min_delta[1][2] * 180 / M_PI << endl;
+    cout << "il1_peak:" << min_delta[2][0] << ", il2_peak:" << min_delta[2][1] << ", il3_peak:"
          << min_delta[2][2] << endl;
+    cout << "il1_rms:" << min_delta[3][0] << ", il2_rms:" << min_delta[3][1] << ", il3_rms:"
+         << min_delta[3][2] << endl;
 }
 
 string output_parameter_to_csv(vector<vector<double>> min_delta) {
     string output = to_string(min_delta[0][0] * 180 / M_PI) + "," + to_string(min_delta[0][1] * 180 / M_PI) + "," +
-                    to_string(min_delta[0][2] * 180 / M_PI)
-                    + "," + to_string(min_delta[1][0]) + "," + to_string(min_delta[2][0]) + "," +
-                    to_string(min_delta[1][1]) + "," + to_string(min_delta[2][1])
-                    + "," + to_string(min_delta[1][2]) + "," + to_string(min_delta[2][2]) + '\n';
+                    to_string(min_delta[0][2] * 180 / M_PI) + "," +
+                    to_string(min_delta[1][0] * 180 / M_PI) + "," + to_string(min_delta[1][1] * 180 / M_PI) + "," +
+                    to_string(min_delta[1][2] * 180 / M_PI) + "," +
+                    to_string(min_delta[2][0]) + "," + to_string(min_delta[3][0]) + "," +
+                    to_string(min_delta[2][1]) + "," + to_string(min_delta[3][1]) + "," +
+                    to_string(min_delta[2][2]) + "," + to_string(min_delta[3][2]) + '\n';
     return output;
 }
+
 
 void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delta3_only = false, bool min = false) {
     vector<double> v(PORT), delta(PORT), p(PORT), phi(PORT);
@@ -193,6 +208,15 @@ void calc_by_input_std(AltSimulator alt_simulator, bool power = false, bool delt
     }
 }
 
+
+string lntrim(string str_ln) {
+    int len = str_ln.length();
+    if (str_ln[len - 1] == '\n' || str_ln[len - 1] == '\r') {
+        str_ln[len - 1] = '\0';
+    }
+    return str_ln;
+}
+
 void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename, bool power = false,
                        bool delta3_only = false, bool min = false) {
     string str_buf;
@@ -206,7 +230,12 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
     ofstream ofs_csv_file_avg_rms(output_filename + "_avg_rms.csv");
     ofstream ofs_csv_file_max_rms(output_filename + "_max_rms.csv");
 
+    int count=0;
     while (getline(ifs_csv_file, str_buf)) {
+
+        fprintf(stderr, "\r%d", count);
+        count++;
+
         vector<double> v(PORT), p(PORT), phi(PORT), delta(PORT);
 
         istringstream i_stream(str_buf);
@@ -215,10 +244,10 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
         for (int i = 0; i < PORT; ++i) {
             getline(i_stream, str_conma_buf, ',');
             if (min) {
-                ofs_csv_file_avg_peak << str_conma_buf << ',';
-                ofs_csv_file_max_peak << str_conma_buf << ',';
-                ofs_csv_file_avg_rms << str_conma_buf << ',';
-                ofs_csv_file_max_rms << str_conma_buf << ',';
+                ofs_csv_file_avg_peak << str_conma_buf + ',';
+                ofs_csv_file_max_peak << str_conma_buf + ',';
+                ofs_csv_file_avg_rms << str_conma_buf + ',';
+                ofs_csv_file_max_rms << str_conma_buf + ',';
             } else {
                 ofs_csv_file << str_conma_buf << ',';
             }
@@ -227,14 +256,17 @@ void calc_by_input_csv(AltSimulator alt_simulator, const string &input_filename,
 
         // 最小ピーク電流のdeltaを計算
         if (min) {
+            // 電力の書き込み
             for (int i = 0; i < PORT; ++i) {
                 getline(i_stream, str_conma_buf, ',');
-                ofs_csv_file_avg_peak << str_conma_buf << ',';
-                ofs_csv_file_max_peak << str_conma_buf << ',';
-                ofs_csv_file_avg_rms << str_conma_buf << ',';
-                ofs_csv_file_max_rms << str_conma_buf << ',';
+                str_conma_buf = lntrim(str_conma_buf);
+                ofs_csv_file_avg_peak << str_conma_buf + ',';
+                ofs_csv_file_max_peak << str_conma_buf + ',';
+                ofs_csv_file_avg_rms << str_conma_buf + ',';
+                ofs_csv_file_max_rms << str_conma_buf + ',';
                 p[i] = stod(str_conma_buf);
             }
+            // 電流値が最小となるdelta,phi,il_peak,il_rmsを取得
             vector<vector<vector<double>>> min_delta = calc_delta3_for_min(alt_simulator, v, p);
             ofs_csv_file_avg_peak << output_parameter_to_csv(min_delta[0]);
             ofs_csv_file_max_peak << output_parameter_to_csv(min_delta[1]);
