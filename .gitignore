@@ -1,5 +1,6 @@
 .idea/
 MEMO.md
+*.csv
 
 # Created by https://www.toptal.com/developers/gitignore/api/clion,c++,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=clion,c++,macos
