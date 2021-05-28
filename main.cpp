@@ -447,6 +447,7 @@ int main(int argc, char *argv[]) {
     cout << "- calc: Calculate il." << endl;
     cout << "- phitop: Calculate power from phase difference." << endl;
     cout << "- ptophi: Calculate phase difference from power." << endl;
+    cout << "- dataset: Create dataset." << endl;
 
     return 0;
 }
